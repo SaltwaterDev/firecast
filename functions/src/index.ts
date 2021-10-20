@@ -1,9 +1,9 @@
 import * as functions from "firebase-functions";
-
-import admin = require("firebase-admin");
-import axios from "axios";
-
+import * as admin from "firebase-admin";
+import "firebase-functions";
 admin.initializeApp();
+
+import axios from "axios";
 
 
 // Listen for changes in all documents in the 'users' collection
@@ -54,3 +54,53 @@ exports.scoreComment = functions.firestore
         });
       });
     });
+
+
+/**
+ * Triggers when a user receive a new comment and sends a notification.
+ * Followers add a flag to `/posts/{postID}/comment/{commentID}`.
+ */
+const db = admin.firestore();
+
+exports.sendCommentNotification = functions.firestore
+  .document("posts/{postID}/comments/{commentID}")
+  .onWrite((change, context) => {
+    const postID = context.params.postID;
+    const comment = change.after.data();
+    const commentID = context.params.commentID;
+    const uid = comment?.uid;
+   
+    if (comment?.content == change.before.data()?.content) {
+      return null;
+    }
+    console.log(
+      "We have a new comment:"+commentID+
+      "for post:"+postID
+    );
+
+    // Get the device notification tokens.
+    return db.doc("users/"+uid).get().then((userSnap) => {
+      const user = userSnap.data();
+      const notificationToken = user?.notificationToken;
+
+      // create notification
+      const message = {
+        notification: {
+          title: "You receive a new response!",
+          body: "Click me to view the response from your post"
+        },
+        token: notificationToken
+      };
+      
+      // Send a message to the device corresponding to the provided
+      // registration token.
+      admin.messaging().send(message)
+        .then((response) => {
+          // Response is a message ID string.
+          console.log("Successfully sent message:", response);
+        })
+        .catch((error) => {
+          console.log("Error sending message:", error);
+        });
+    });
+ });
