@@ -78,29 +78,46 @@ exports.sendCommentNotification = functions.firestore
       "for post:"+postID
     );
 
-    // Get the device notification tokens.
-    return db.doc("users/"+uid).get().then((userSnap) => {
-      const user = userSnap.data();
-      const notificationToken = user?.notificationToken;
+    const postRef = change.after.ref.parent.parent;
+    return postRef?.get().then((parentSnap) => {
+      const post = parentSnap.data();
+      const writerUid = post?.author_uid;
 
-      // create notification
-      const message = {
-        notification: {
-          title: "You receive a new response!",
-          body: "Click me to view the response from your post"
-        },
-        token: notificationToken
-      };
-      
-      // Send a message to the device corresponding to the provided
-      // registration token.
-      admin.messaging().send(message)
-        .then((response) => {
-          // Response is a message ID string.
-          console.log("Successfully sent message:", response);
-        })
-        .catch((error) => {
-          console.log("Error sending message:", error);
-        });
+      console.log(
+        "comment uid: "+uid+
+        "post uid: "+writerUid
+      );
+  
+      // Dont send notification if it is the writer who send the comment
+      if (uid == writerUid){
+        return null
+      }
+
+      // Get the device notification tokens.
+      return db.doc("users/"+uid).get().then((userSnap) => {
+        const user = userSnap.data();
+        const notificationToken = user?.notificationToken;
+
+        // create notification
+        const message = {
+          data: {
+            pid: postID,
+            title: "You receive a new response!",
+            body: "Click me to view the response from your post"
+          },
+          token: notificationToken
+        };
+        
+        // Send a message to the device corresponding to the provided
+        // registration token.
+        admin.messaging().send(message)
+          .then((response) => {
+            // Response is a message ID string.
+            console.log("Successfully sent message:", response);
+          })
+          .catch((error) => {
+            console.log("Error sending message:", error);
+          });
+      });
     });
  });
