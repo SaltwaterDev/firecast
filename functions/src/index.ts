@@ -35,7 +35,7 @@ exports.scoreComment = functions.firestore
 
         return axios({
           method: "post",
-          url: "http://34.122.182.235:8501/v1/models/reddit_electra_small:predict",
+          url: "http://35.188.42.222:8501/v1/models/reddit_electra_small:predict",
           data: {"inputs": {
             "sentence1": [postContent],
             "sentence2": [commentContent],
@@ -121,3 +121,55 @@ exports.sendCommentNotification = functions.firestore
       });
     });
  });
+
+// Validate the school email. This function can only validate universities/colleges in hk and some sec. schools using "@gmail.edu.hk" 
+exports.validateSchoolEmail = functions.https.onCall(async (data) => {
+  // Grab the text parameter.
+  const email = data.text;
+  console.log("receiving text:", email);
+  if (typeof email === "string"){
+    const domain = email.substring(email.lastIndexOf("@") +1);
+    // create the list of validated school domain
+    const schoolDomains = ["connect.hku.hk", "connect.ust.hk", "s.eduhk.hk",
+    "connect.polyu.hk", "link.cuhk.edu.hk", "my.cityu.edu.hk", "life.hkbu.edu.hk",
+    "study.ouhk.edu.hk", "hsu.edu.hk", "alumni.hksyu.edu.hk", "hksyu.edu.hk",
+    "student.hkcc-polyu.edu.hk", "learner.hkuspace.hku.hk", "stu.vtc.edu.hk",
+    "gmail.edu.hk", "ln.hk"]
+
+    if (schoolDomains.includes(domain)){
+      console.log("validation:", "true");
+      return {validation: "true"};
+    }
+    if (email == "yannylo123123@gmail.com"){
+      console.log("validation:", "true");
+      return {validation: "true"};
+    }
+    console.log("validation:", "false");
+    return {validation: "false"};
+  }
+  console.log("validation:", "error");
+  return {validation: "error: receiving text is: "+email};
+});
+
+
+exports.updateLabel = functions.firestore
+    .document("posts/{postId}")
+    .onCreate((snap, context) => {
+      // Get an object representing the document
+      // e.g. {'author_uid': 'i73b5yr897y', 'content': "xxx", ...}
+      const newPostValue = snap.data();
+
+      // access a labels field
+      const labels: Array<string> = newPostValue.labels;
+      const labelRef = db.collection("categories").doc("self_made_labels");
+      console.log("labels: ", labels)
+  
+      return labelRef.get().then(async (snap) => {
+      // union with new label(s) to the "list" array field.
+      for(const label of labels){
+        const unionRes = await labelRef.update({
+          list: admin.firestore.FieldValue.arrayUnion(label)
+        });
+      }
+    });
+  });

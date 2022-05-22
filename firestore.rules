@@ -1,0 +1,44 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    match /reports/{report} {
+      allow create: if request.auth != null;
+    }
+    match /issues/{issueDocument}{
+    	allow read: if request.auth != null;
+      match /{issue_List}/{issue} {
+      	allow create: if request.auth != null;
+    	}
+    }
+    match /posts/{pid}/comments/{comment}/likes/{like} {
+      allow create, read: if request.auth != null;
+      allow delete: if request.auth != null && request.auth.uid == resource.data.likedBy;
+    }
+    match /posts/{pid}/comments/{comment=**}  {
+      allow create, read: if request.auth != null;
+      match /{sub_comments}/{sc}/likes/{like}	{
+      	allow create, read: if request.auth != null;
+      	allow delete: if request.auth != null && request.auth.uid == resource.data.likedBy;    
+      }
+    }
+    match /posts/{pid} {
+      allow create, read: if (request.auth != null);
+      allow delete: if (request.auth != null) && (request.auth.uid == resource.data.author_uid);
+    }
+    match /users/{uid} {
+      allow read, update: if (request.auth != null) && (request.auth.uid == uid);
+			allow create: if request.auth != null;
+			match /saved/{document} {  
+      	allow read, write, delete
+    	}
+    }
+
+    match /categories/{tags=**} {
+      allow read: if request.auth != null;
+    }
+  }
+}
